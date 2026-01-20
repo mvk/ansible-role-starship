@@ -1,5 +1,4 @@
 ---
-
 - name: Check existing install
   register: starship_version_check
   failed_when: false
@@ -30,4 +29,9 @@
   tags:
     - starship
 
-...
+- name: Configure starship prompt
+  ansible.builtin.include_tasks: "configure.yml"
+  when:
+    - starship_configuration is defined
+    - starship_configuration is mapping
+    - starship_configuration | length > 0

@@ -1,0 +1,106 @@
+---
+# tasks for configuring starship prompt
+
+- name: Configure target variables
+  ansible.builtin.set_fact:
+    starship_target_user: "{{ starship_configuration.user | default(ansible_user_id) }}"
+    starship_target_shell: "{{ starship_configuration.shell | default('') }}"
+    starship_target_preset: "{{ starship_configuration.preset | default(starship_default_preset) }}"
+    starship_target_home: "{{ ansible_user_dir }}"
+
+- name: Set target user shell
+  when:
+    - starship_target_shell | default("") | length == 0
+  block:
+    - name: Detect effective passwd entry for {{ starship_target_user }}
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ starship_target_user }}" # Replace with the actual username
+    - name: Update target shell variable
+      ansible.builtin.set_fact:
+        starship_target_shell: "{{ ansible_facts.getent_passwd[starship_target_user][5] | ansible.builtin.basename }}"
+        starship_target_home: "{{ ansible_facts.getent_passwd[starship_target_user][4] }}"
+
+- name: Skip Starship configuration if shell is unsupported
+  ansible.builtin.meta: end_host
+  when:
+    - starship_target_shell not in starship_supported_shells
+
+- name: Setup shell config file
+  ansible.builtin.set_fact:
+    shell_config_file: "{{ starship_target_home }}/.{{ starship_target_shell }}rc"
+    starship_config_file: "{{ starship_target_home }}/.config/starship.toml"
+
+- name: Ensure starship init is present in shell config
+  ansible.builtin.lineinfile:
+    path: "{{ shell_config_file }}"
+    line: 'eval "$(starship init {{ starship_target_shell }})"'
+    regexp: '^eval "\$\(starship init'
+    state: present
+    create: true
+    owner: "{{ starship_target_user }}"
+    mode: "0644"
+  become: true
+
+- name: Ensure Starship configuration folder exists
+  ansible.builtin.file:
+    path: "{{ starship_config_file | ansible.builtin.dirname }}"
+    mode: "0750"
+    owner: "{{ starship_target_user }}"
+    state: directory
+
+- name: Calculate sha256sum of possibly pre-existing starship config
+  ansible.builtin.stat:
+    path: "{{ starship_config_file }}"
+    checksum_algorithm: sha256
+  register: starship_config_stat
+
+- name: Set old checksum fact
+  ansible.builtin.set_fact:
+    starship_old_checksum: "{{ starship_config_stat.stat.checksum | default('') }}"
+
+- name: Generate temp file for starship config
+  ansible.builtin.tempfile:
+    state: file
+    suffix: .toml
+  register: starship_tmp_toml_result
+
+- name: Set starship_tmp_toml path
+  ansible.builtin.set_fact:
+    starship_tmp_toml: "{{ starship_tmp_toml_result.path }}"
+
+- name: Generate starship preset
+  ansible.builtin.command:
+    cmd: '"{{ starship_install_directory }}/starship" preset "{{ starship_target_preset }}" -o "{{ starship_tmp_toml }}"'
+  changed_when: true
+
+- name: Calculate sha256sum of the generated file
+  ansible.builtin.stat:
+    path: "{{ starship_tmp_toml }}"
+    checksum_algorithm: sha256
+  register: starship_new_config_stat
+
+- name: Backup existing starship config
+  ansible.builtin.copy:
+    src: "{{ starship_config_file }}"
+    dest: "{{ starship_config_file }}.backup.{{ ansible_date_time.epoch }}"
+    remote_src: true
+    mode: preserve
+  when:
+    - starship_old_checksum | length > 0
+    - starship_new_config_stat.stat.checksum != starship_old_checksum
+
+- name: Move new starship config to target
+  ansible.builtin.copy:
+    src: "{{ starship_tmp_toml }}"
+    dest: "{{ starship_config_file }}"
+    remote_src: true
+    mode: "0644"
+    owner: "{{ starship_target_user }}"
+  when:
+    - starship_new_config_stat.stat.checksum != starship_old_checksum
+
+- name: Remove temporary file
+  ansible.builtin.file:
+    path: "{{ starship_tmp_toml }}"
+    state: absent

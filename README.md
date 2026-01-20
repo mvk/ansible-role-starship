@@ -24,6 +24,7 @@ Building and improving this Ansible role have been sponsored by my current and p
   - [starship_owner](#starship_owner)
   - [starship_version](#starship_version)
   - [starship_version_changed](#starship_version_changed)
+  - [starship_configuration](#starship_configuration)
 - [Discovered Tags](#discovered-tags)
 - [Dependencies](#dependencies)
 - [License](#license)
@@ -107,6 +108,16 @@ Fact to define if the version has changed
 
 ```YAML
 starship_version_changed: false
+```
+
+### starship_configuration
+
+Configuration to enable starship prompt with
+
+#### Default value
+
+```YAML
+starship_configuration: {}
 ```
 
 ## Discovered Tags

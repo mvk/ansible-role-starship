@@ -18,4 +18,16 @@ starship_owner: root
 # @var starship_group:description: Group who will own the binary file
 starship_group: root
 
-...
+# @var starship_configuration:description: Configure the starship prompt using the information in this dictionary
+starship_configuration: {}
+# Configuration dict example:
+# user: <username>
+# shell: <override user's default shell>
+# preset: <override default preset>
+
+# @var starship_shells:description: Supported shells for configuration edit, other shells can be added later
+starship_supported_shells:
+  - bash
+  - zsh
+
+starship_default_preset: "bracketed-segments"
