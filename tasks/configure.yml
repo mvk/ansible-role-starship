@@ -48,6 +48,7 @@
     mode: "0750"
     owner: "{{ starship_target_user }}"
     state: directory
+  become: true
 
 - name: Calculate sha256sum of possibly pre-existing starship config
   ansible.builtin.stat:
@@ -72,12 +73,14 @@
 - name: Generate starship preset
   ansible.builtin.command:
     cmd: '"{{ starship_install_directory }}/starship" preset "{{ starship_target_preset }}" -o "{{ starship_tmp_toml }}"'
+  become: true
   changed_when: true
 
 - name: Calculate sha256sum of the generated file
   ansible.builtin.stat:
     path: "{{ starship_tmp_toml }}"
     checksum_algorithm: sha256
+  become: true
   register: starship_new_config_stat
 
 - name: Backup existing starship config
@@ -86,6 +89,7 @@
     dest: "{{ starship_config_file }}.backup.{{ ansible_date_time.epoch }}"
     remote_src: true
     mode: preserve
+  become: true
   when:
     - starship_old_checksum | length > 0
     - starship_new_config_stat.stat.checksum != starship_old_checksum
@@ -97,6 +101,7 @@
     remote_src: true
     mode: "0644"
     owner: "{{ starship_target_user }}"
+  become: true
   when:
     - starship_new_config_stat.stat.checksum != starship_old_checksum
 
@@ -104,3 +109,4 @@
   ansible.builtin.file:
     path: "{{ starship_tmp_toml }}"
     state: absent
+  become: true

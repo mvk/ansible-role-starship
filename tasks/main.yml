@@ -26,6 +26,7 @@
     remote_src: true
     owner: "{{ starship_owner }}"
     group: "{{ starship_group }}"
+  become: true
   tags:
     - starship
 
